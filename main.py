@@ -13,88 +13,136 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 CHECK_INTERVAL_MINUTES = int(os.getenv("CHECK_INTERVAL_MINUTES", "60"))
 OFFER_PERCENT_BELOW_NORMAL = float(os.getenv("OFFER_PERCENT_BELOW_NORMAL", "15"))
 
-PRODUCTS = [
+TRACKED_PRODUCTS = [
     {
-        "name": "PS5 Slim",
-        "search_query": "PS5 Slim consola",
-        "must_include": ["ps5", "slim"],
-        "console_words": ["consola", "console", "playstation 5", "ps5"],
+        "name": "PS5 Slim - Falabella",
+        "product": "PS5 Slim",
+        "store": "Falabella",
+        "url": "PEGA_AQUI_LINK_ESPECIFICO_PS5_SLIM_FALABELLA",
         "normal_price": 570000,
         "min_price": 350000,
         "max_price": 800000,
+        "must_include": ["ps5"],
+        "exclude": [
+            "control",
+            "dualsense",
+            "juego",
+            "funda",
+            "cargador",
+            "audífono",
+            "audifono",
+            "headset",
+            "soporte",
+            "base",
+            "cable",
+            "repuesto",
+            "servicio técnico",
+        ],
     },
     {
-        "name": "PS5 Pro",
-        "search_query": "PS5 Pro consola",
-        "must_include": ["ps5", "pro"],
-        "console_words": ["consola", "console", "playstation 5", "ps5"],
+        "name": "PS5 Pro - Falabella",
+        "product": "PS5 Pro",
+        "store": "Falabella",
+        "url": "PEGA_AQUI_LINK_ESPECIFICO_PS5_PRO_FALABELLA",
         "normal_price": 850000,
         "min_price": 550000,
         "max_price": 1200000,
+        "must_include": ["ps5", "pro"],
+        "exclude": [
+            "control",
+            "dualsense",
+            "juego",
+            "funda",
+            "cargador",
+            "audífono",
+            "audifono",
+            "headset",
+            "soporte",
+            "base",
+            "cable",
+            "repuesto",
+            "servicio técnico",
+        ],
     },
     {
-        "name": "Nintendo Switch 2",
-        "search_query": "Nintendo Switch 2 consola",
-        "must_include": ["switch", "2"],
-        "console_words": ["consola", "console", "nintendo switch 2", "system"],
+        "name": "Nintendo Switch 2 - Falabella",
+        "product": "Nintendo Switch 2",
+        "store": "Falabella",
+        "url": "PEGA_AQUI_LINK_ESPECIFICO_SWITCH_2_FALABELLA",
         "normal_price": 630000,
         "min_price": 400000,
         "max_price": 850000,
+        "must_include": ["switch"],
+        "exclude": [
+            "juego",
+            "control",
+            "joy-con",
+            "joycon",
+            "funda",
+            "cargador",
+            "audífono",
+            "audifono",
+            "headset",
+            "soporte",
+            "base",
+            "cable",
+            "repuesto",
+            "servicio técnico",
+            "amiibo",
+        ],
     },
-]
-
-STORES = [
     {
-        "name": "Mercado Libre Chile",
-        "search_url": "https://listado.mercadolibre.cl/{query}",
+        "name": "PS5 Slim - Paris",
+        "product": "PS5 Slim",
+        "store": "Paris",
+        "url": "PEGA_AQUI_LINK_ESPECIFICO_PS5_SLIM_PARIS",
+        "normal_price": 570000,
+        "min_price": 350000,
+        "max_price": 800000,
+        "must_include": ["ps5"],
+        "exclude": [
+            "control",
+            "dualsense",
+            "juego",
+            "funda",
+            "cargador",
+            "audífono",
+            "audifono",
+            "headset",
+            "soporte",
+            "base",
+            "cable",
+            "repuesto",
+            "servicio técnico",
+        ],
     },
     {
-        "name": "Falabella",
-        "search_url": "https://www.falabella.com/falabella-cl/search?Ntt={query}",
+        "name": "Nintendo Switch 2 - Paris",
+        "product": "Nintendo Switch 2",
+        "store": "Paris",
+        "url": "PEGA_AQUI_LINK_ESPECIFICO_SWITCH_2_PARIS",
+        "normal_price": 630000,
+        "min_price": 400000,
+        "max_price": 850000,
+        "must_include": ["switch"],
+        "exclude": [
+            "juego",
+            "control",
+            "joy-con",
+            "joycon",
+            "funda",
+            "cargador",
+            "audífono",
+            "audifono",
+            "headset",
+            "soporte",
+            "base",
+            "cable",
+            "repuesto",
+            "servicio técnico",
+            "amiibo",
+        ],
     },
-    {
-        "name": "Paris",
-        "search_url": "https://www.paris.cl/search?q={query}",
-    },
-]
-
-EXCLUDED_WORDS = [
-    "control",
-    "dualsense",
-    "joystick",
-    "juego",
-    "games",
-    "game",
-    "funda",
-    "carcasa",
-    "protector",
-    "cargador",
-    "carga",
-    "cable",
-    "soporte",
-    "base",
-    "dock",
-    "audifono",
-    "audífono",
-    "headset",
-    "cover",
-    "skin",
-    "grip",
-    "mando",
-    "portal",
-    "lector",
-    "disco duro",
-    "ssd",
-    "memoria",
-    "gift card",
-    "tarjeta",
-    "servicio técnico",
-    "reparación",
-    "repuesto",
-    "adaptador",
-    "estuche",
-    "bolso",
-    "amiibo",
 ]
 
 sent_alerts = set()
@@ -173,229 +221,144 @@ def extract_prices_from_text(text):
     return prices
 
 
-def looks_like_console_product(text, product):
-    text = normalize_text(text)
+def page_matches_product(html, item):
+    text = normalize_text(BeautifulSoup(html, "html.parser").get_text(" ", strip=True))
 
-    if any(word in text for word in EXCLUDED_WORDS):
-        return False
+    for word in item["must_include"]:
+        if word.lower() not in text:
+            print(f"No se encontró palabra obligatoria '{word}' en {item['name']}", flush=True)
+            return False
 
-    if not all(word in text for word in product["must_include"]):
-        return False
-
-    if not any(word in text for word in product["console_words"]):
-        return False
+    for word in item["exclude"]:
+        if word.lower() in text and item["product"].lower() not in text:
+            print(f"Página posiblemente no corresponde por palabra excluida: {word}", flush=True)
+            return False
 
     return True
 
 
-def find_candidate_blocks(soup):
-    selectors = [
-        "li",
-        "article",
-        "div.pod",
-        "div[data-testid]",
-        "div.ui-search-result",
-        "div.poly-card",
-        "div",
-    ]
-
-    blocks = []
-
-    for selector in selectors:
-        for element in soup.select(selector):
-            text = element.get_text(" ", strip=True)
-
-            if "$" not in text:
-                continue
-
-            if len(text) < 20:
-                continue
-
-            if len(text) > 1500:
-                continue
-
-            blocks.append(text)
-
-    unique_blocks = []
-    seen = set()
-
-    for block in blocks:
-        compact = " ".join(block.split())
-
-        if compact in seen:
-            continue
-
-        seen.add(compact)
-        unique_blocks.append(compact)
-
-    return unique_blocks
-
-
-def extract_price_alerts(html, store_name, product, url):
+def detect_product_price(html, item):
     soup = BeautifulSoup(html, "html.parser")
-    blocks = find_candidate_blocks(soup)
+    text = soup.get_text(" ", strip=True)
 
-    alert_price_limit = int(
-        product["normal_price"] * (1 - OFFER_PERCENT_BELOW_NORMAL / 100)
-    )
+    all_prices = extract_prices_from_text(text)
 
-    print(
-        f"{store_name} / {product['name']}: precio normal {product['normal_price']} | alerta bajo {alert_price_limit}",
-        flush=True,
-    )
-
-    candidates = []
-
-    for block in blocks:
-        if not looks_like_console_product(block, product):
-            continue
-
-        prices = extract_prices_from_text(block)
-
-        valid_prices = [
-            price
-            for price in prices
-            if product["min_price"] <= price <= product["max_price"]
-        ]
-
-        if not valid_prices:
-            continue
-
-        detected_price = min(valid_prices)
-
-        candidates.append(
-            {
-                "price": detected_price,
-                "text": block[:250],
-            }
-        )
-
-    if not candidates:
-        print(f"No se encontraron consolas válidas para {product['name']} en {store_name}", flush=True)
-        return []
-
-    candidates = sorted(candidates, key=lambda item: item["price"])
-
-    print(
-        f"{store_name} / {product['name']}: candidatos válidos {[c['price'] for c in candidates[:5]]}",
-        flush=True,
-    )
-
-    best_candidate = candidates[0]
-    current_price = best_candidate["price"]
-
-    if current_price > alert_price_limit:
-        print(
-            f"Sin alerta: {product['name']} en {store_name} está en {current_price}, sobre el límite {alert_price_limit}",
-            flush=True,
-        )
-        return []
-
-    discount_vs_normal = round(
-        ((product["normal_price"] - current_price) / product["normal_price"]) * 100,
-        1,
-    )
-
-    return [
-        {
-            "store": store_name,
-            "product": product["name"],
-            "current_price": current_price,
-            "normal_price": product["normal_price"],
-            "alert_price_limit": alert_price_limit,
-            "discount_vs_normal": discount_vs_normal,
-            "url": url,
-            "matched_text": best_candidate["text"],
-        }
+    valid_prices = [
+        price
+        for price in all_prices
+        if item["min_price"] <= price <= item["max_price"]
     ]
 
+    valid_prices = sorted(set(valid_prices))
 
-def check_store_product(store, product):
-    query = product["search_query"].replace(" ", "-")
-    url = store["search_url"].format(query=query)
+    print(f"{item['name']}: precios válidos detectados {valid_prices[:10]}", flush=True)
 
-    print(f"Revisando {product['name']} en {store['name']}", flush=True)
+    if not valid_prices:
+        return None
 
-    html = get_page(url)
-
-    if not html:
-        return []
-
-    return extract_price_alerts(
-        html=html,
-        store_name=store["name"],
-        product=product,
-        url=url,
-    )
+    return min(valid_prices)
 
 
 def format_price(price):
     return f"${price:,.0f}".replace(",", ".")
 
 
-def alert_key(result):
-    return f"{result['store']}|{result['product']}|{result['current_price']}"
+def alert_key(item, current_price):
+    return f"{item['name']}|{current_price}"
 
 
-def build_alert_message(result):
+def build_alert_message(item, current_price, alert_price_limit, discount_vs_normal):
     return f"""
-🚨 <b>Alerta de consola bajo precio normal</b>
+🚨 <b>Alerta de precio bajo en consola</b>
 
-🎮 <b>{result['product']}</b>
-🏬 Tienda: {result['store']}
+🎮 <b>{item['product']}</b>
+🏬 Tienda: {item['store']}
 
-💰 Precio detectado: <b>{format_price(result['current_price'])}</b>
-📌 Precio normal estimado: {format_price(result['normal_price'])}
-🎯 Aviso configurado bajo: {format_price(result['alert_price_limit'])}
-🔥 Baja vs. precio normal: <b>{result['discount_vs_normal']}%</b>
+💰 Precio detectado: <b>{format_price(current_price)}</b>
+📌 Precio normal estimado: {format_price(item['normal_price'])}
+🎯 Aviso configurado bajo: {format_price(alert_price_limit)}
+🔥 Baja vs. precio normal: <b>{discount_vs_normal}%</b>
 
-🧾 Coincidencia detectada:
-{result['matched_text']}
-
-🔗 Revisar tienda:
-{result['url']}
+🔗 Ver producto:
+{item['url']}
 """.strip()
 
 
+def check_tracked_product(item):
+    if item["url"].startswith("PEGA_AQUI"):
+        print(f"Falta configurar URL para {item['name']}", flush=True)
+        return
+
+    print(f"Revisando {item['name']}", flush=True)
+
+    html = get_page(item["url"])
+
+    if not html:
+        return
+
+    if not page_matches_product(html, item):
+        print(f"La página no parece corresponder a {item['name']}", flush=True)
+        return
+
+    current_price = detect_product_price(html, item)
+
+    if not current_price:
+        print(f"No se pudo detectar precio para {item['name']}", flush=True)
+        return
+
+    alert_price_limit = int(
+        item["normal_price"] * (1 - OFFER_PERCENT_BELOW_NORMAL / 100)
+    )
+
+    print(
+        f"{item['name']}: precio detectado {current_price} | precio normal {item['normal_price']} | alerta bajo {alert_price_limit}",
+        flush=True,
+    )
+
+    if current_price > alert_price_limit:
+        print(f"Sin alerta para {item['name']}: precio sobre el límite", flush=True)
+        return
+
+    discount_vs_normal = round(
+        ((item["normal_price"] - current_price) / item["normal_price"]) * 100,
+        1,
+    )
+
+    key = alert_key(item, current_price)
+
+    if key in sent_alerts:
+        print(f"Alerta ya enviada para {item['name']} a {current_price}", flush=True)
+        return
+
+    message = build_alert_message(
+        item=item,
+        current_price=current_price,
+        alert_price_limit=alert_price_limit,
+        discount_vs_normal=discount_vs_normal,
+    )
+
+    send_telegram_message(message)
+    sent_alerts.add(key)
+    print(f"Alerta enviada para {item['name']} a {current_price}", flush=True)
+
+
 def run_check():
-    print("Iniciando revisión de consolas...", flush=True)
+    print("Iniciando revisión de links específicos...", flush=True)
 
-    for store in STORES:
-        for product in PRODUCTS:
-            try:
-                results = check_store_product(store, product)
+    for item in TRACKED_PRODUCTS:
+        try:
+            check_tracked_product(item)
+            time.sleep(5)
 
-                if not results:
-                    print(
-                        f"Sin alertas para {product['name']} en {store['name']}",
-                        flush=True,
-                    )
-
-                for result in results:
-                    key = alert_key(result)
-
-                    if key not in sent_alerts:
-                        message = build_alert_message(result)
-                        send_telegram_message(message)
-                        sent_alerts.add(key)
-                        print("Alerta enviada:", key, flush=True)
-                    else:
-                        print("Alerta ya enviada:", key, flush=True)
-
-                time.sleep(5)
-
-            except Exception as e:
-                print(
-                    f"Error revisando {product['name']} en {store['name']}: {e}",
-                    flush=True,
-                )
+        except Exception as e:
+            print(f"Error revisando {item['name']}: {e}", flush=True)
 
     print("Revisión terminada.", flush=True)
 
 
 def main():
     print("Bot iniciado", flush=True)
-    send_telegram_message("✅ Bot de alertas de consolas iniciado correctamente.")
+    send_telegram_message("✅ Bot de alertas por link específico iniciado correctamente.")
 
     while True:
         run_check()
