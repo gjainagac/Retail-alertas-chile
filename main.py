@@ -40,10 +40,6 @@ STORES = [
         "name": "Paris",
         "search_url": "https://www.paris.cl/search?q={query}",
     },
-    {
-        "name": "Ripley",
-        "search_url": "https://simple.ripley.cl/search/{query}",
-    },
 ]
 
 sent_alerts = set()
@@ -65,10 +61,12 @@ def send_telegram_message(message):
 
     try:
         response = requests.post(url, json=payload, timeout=20)
+
         if response.status_code != 200:
             print("Error enviando mensaje a Telegram:", response.text, flush=True)
         else:
             print("Mensaje enviado a Telegram correctamente", flush=True)
+
     except Exception as e:
         print("Error conectando con Telegram:", e, flush=True)
 
@@ -90,6 +88,11 @@ def clean_price(price_text):
     if not digits:
         return None
 
+    # Evita errores cuando una página trae bloques gigantes de números.
+    # Un precio chileno razonable no debería tener más de 10 dígitos.
+    if len(digits) > 10:
+        return None
+
     return int(digits)
 
 
@@ -106,16 +109,18 @@ def calculate_discount(original_price, current_price):
 def get_page(url):
     headers = {
         "User-Agent": (
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
-            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 "
-            "Mobile/15E148 Safari/604.1"
-        )
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "es-CL,es;q=0.9,en;q=0.8",
     }
 
     try:
         response = requests.get(url, headers=headers, timeout=25)
         response.raise_for_status()
         return response.text
+
     except Exception as e:
         print(f"Error leyendo {url}: {e}", flush=True)
         return None
@@ -133,6 +138,7 @@ def extract_products_generic(html, store_name, product_name, url):
             product_keywords = product["keywords"]
 
     if not any(keyword in text for keyword in product_keywords):
+        print(f"No se encontraron keywords de {product_name} en {store_name}", flush=True)
         return results
 
     price_candidates = []
@@ -147,6 +153,11 @@ def extract_products_generic(html, store_name, product_name, url):
                 price_candidates.append(price)
 
     price_candidates = sorted(set(price_candidates))
+
+    print(
+        f"{store_name} / {product_name}: precios detectados {price_candidates[:10]}",
+        flush=True,
+    )
 
     if len(price_candidates) < 2:
         return results
@@ -222,6 +233,12 @@ def run_check():
             try:
                 results = check_store_product(store, product)
 
+                if not results:
+                    print(
+                        f"Sin alertas para {product['name']} en {store['name']}",
+                        flush=True,
+                    )
+
                 for result in results:
                     key = alert_key(result)
 
@@ -236,7 +253,10 @@ def run_check():
                 time.sleep(5)
 
             except Exception as e:
-                print(f"Error revisando {product['name']} en {store['name']}: {e}", flush=True)
+                print(
+                    f"Error revisando {product['name']} en {store['name']}: {e}",
+                    flush=True,
+                )
 
     print("Revisión terminada.", flush=True)
 
