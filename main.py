@@ -9,21 +9,23 @@ load_dotenv()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-DISCOUNT_THRESHOLD = float(os.getenv("DISCOUNT_THRESHOLD", "30"))
 CHECK_INTERVAL_MINUTES = int(os.getenv("CHECK_INTERVAL_MINUTES", "60"))
 
 PRODUCTS = [
     {
         "name": "PS5 Slim",
         "keywords": ["ps5 slim", "playstation 5 slim"],
+        "target_price": 450000,
     },
     {
         "name": "PS5 Pro",
         "keywords": ["ps5 pro", "playstation 5 pro"],
+        "target_price": 650000,
     },
     {
         "name": "Nintendo Switch 2",
         "keywords": ["switch 2", "nintendo switch 2"],
+        "target_price": 450000,
     },
 ]
 
@@ -88,22 +90,10 @@ def clean_price(price_text):
     if not digits:
         return None
 
-    # Evita errores cuando una página trae bloques gigantes de números.
-    # Un precio chileno razonable no debería tener más de 10 dígitos.
     if len(digits) > 10:
         return None
 
     return int(digits)
-
-
-def calculate_discount(original_price, current_price):
-    if not original_price or not current_price:
-        return None
-
-    if original_price <= current_price:
-        return None
-
-    return round(((original_price - current_price) / original_price) * 100, 1)
 
 
 def get_page(url):
@@ -126,16 +116,15 @@ def get_page(url):
         return None
 
 
-def extract_products_generic(html, store_name, product_name, url):
+def extract_price_alerts(html, store_name, product, url):
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(" ", strip=True).lower()
 
     results = []
 
-    product_keywords = []
-    for product in PRODUCTS:
-        if product["name"] == product_name:
-            product_keywords = product["keywords"]
+    product_name = product["name"]
+    product_keywords = product["keywords"]
+    target_price = product["target_price"]
 
     if not any(keyword in text for keyword in product_keywords):
         print(f"No se encontraron keywords de {product_name} en {store_name}", flush=True)
@@ -159,22 +148,18 @@ def extract_products_generic(html, store_name, product_name, url):
         flush=True,
     )
 
-    if len(price_candidates) < 2:
+    if not price_candidates:
         return results
 
-    current_price = price_candidates[0]
-    original_price = price_candidates[-1]
+    lowest_price = price_candidates[0]
 
-    discount = calculate_discount(original_price, current_price)
-
-    if discount and discount >= DISCOUNT_THRESHOLD:
+    if lowest_price <= target_price:
         results.append(
             {
                 "store": store_name,
                 "product": product_name,
-                "current_price": current_price,
-                "original_price": original_price,
-                "discount": discount,
+                "current_price": lowest_price,
+                "target_price": target_price,
                 "url": url,
             }
         )
@@ -193,10 +178,10 @@ def check_store_product(store, product):
     if not html:
         return []
 
-    return extract_products_generic(
+    return extract_price_alerts(
         html=html,
         store_name=store["name"],
-        product_name=product["name"],
+        product=product,
         url=url,
     )
 
@@ -211,22 +196,21 @@ def alert_key(result):
 
 def build_alert_message(result):
     return f"""
-🚨 <b>Alerta de descuento</b>
+🚨 <b>Alerta de precio bajo</b>
 
 🎮 <b>{result['product']}</b>
 🏬 Tienda: {result['store']}
 
-💰 Precio actual: <b>{format_price(result['current_price'])}</b>
-💸 Precio referencia: {format_price(result['original_price'])}
-🔥 Descuento estimado: <b>{result['discount']}%</b>
+💰 Precio detectado: <b>{format_price(result['current_price'])}</b>
+🎯 Precio objetivo: {format_price(result['target_price'])}
 
-🔗 Ver oferta:
+🔗 Ver producto:
 {result['url']}
 """.strip()
 
 
 def run_check():
-    print("Iniciando revisión de ofertas...", flush=True)
+    print("Iniciando revisión de precios...", flush=True)
 
     for store in STORES:
         for product in PRODUCTS:
@@ -263,7 +247,7 @@ def run_check():
 
 def main():
     print("Bot iniciado", flush=True)
-    send_telegram_message("✅ Bot de alertas iniciado correctamente.")
+    send_telegram_message("✅ Bot de alertas de precio iniciado correctamente.")
 
     while True:
         run_check()
